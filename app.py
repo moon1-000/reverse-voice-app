@@ -1,28 +1,17 @@
 import streamlit as st
 from streamlit_mic_recorder import mic_recorder
-import numpy as np
+from pydub import AudioSegment
 import io
-import wave
 
-# --- 앱 설정 및 스타일 ---
+# --- 앱 설정 ---
 st.set_page_config(page_title="⏪ 리버스 보이스", layout="centered")
 
 st.markdown("""
 <style>
-    .block {
-        border-radius: 15px;
-        padding: 30px;
-        margin: 10px 0;
-        text-align: center;
-        color: white;
-        font-weight: bold;
-        font-size: 20px;
-    }
+    .block { border-radius: 15px; padding: 30px; margin: 10px 0; text-align: center; color: white; font-weight: bold; font-size: 20px; }
     .red { background-color: #E74C3C; }
     .green { background-color: #2ECC71; }
     .blue { background-color: #3498DB; }
-    /* 오디오 플레이어 스타일 숨기기 (깔끔하게) */
-    audio { width: 100%; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -38,45 +27,34 @@ audio = mic_recorder(
 )
 
 if audio:
-    # 2. 정방향 재생 섹션 (Green Block)
+    # 2. 오디오 처리 (Pydub 활용) 💡 어떤 형식이든 WAV로 변환해줍니다.
+    audio_bytes = audio['bytes']
+    audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+
+    # --- 2. 정방향 재생 섹션 (Green Block) ---
     st.markdown("---")
     st.markdown("<div class='block green'>▶️ Play Recorded</div>", unsafe_allow_html=True)
-    st.audio(audio['bytes'], format='audio/wav')
+    st.audio(audio_bytes)
 
-    # 3. 역방향 처리 로직
-    audio_bio = io.BytesIO(audio['bytes'])
-    with wave.open(audio_bio, 'rb') as wav_file:
-        params = wav_file.getparams()
-        frames = wav_file.readframes(params.nframes)
-        audio_array = np.frombuffer(frames, dtype=np.int16)
-        # 💡 핵심 기능: 데이터를 거꾸로 뒤집기!
-        reversed_array = audio_array[::-1]
-        
-        output_bio = io.BytesIO()
-        with wave.open(output_bio, 'wb') as wav_out:
-            wav_out.setparams(params)
-            wav_out.writeframes(reversed_array.tobytes())
-
-    # 4. 역방향 재생 섹션 (Blue Block)
+    # --- 3. 역방향 처리 섹션 (Blue Block) ---
+    # 💡 한 줄로 소리 뒤집기!
+    reversed_audio = audio_segment.reverse()
+    
+    # 다시 플레이어로 내보내기 위해 변환
+    buf = io.BytesIO()
+    reversed_audio.export(buf, format="wav")
+    
     st.markdown("---")
     st.markdown("<div class='block blue'>⏪ Play Reverse</div>", unsafe_allow_html=True)
-    st.audio(output_bio.getvalue(), format='audio/wav')
+    st.audio(buf.getvalue())
     
-    st.success("✨ 목소리가 거꾸로 뒤집혔습니다! 신기하죠?")
+    st.success("✨ 목소리를 성공적으로 뒤집었습니다!")
 
 else:
-    st.info("💡 위의 빨간색 버튼 영역에서 '녹음 시작하기'를 눌러보세요.")
+    st.info("💡 빨간색 버튼을 눌러 녹음을 시작해보세요.")
 
-# --- 사이드바 설정 (달력 앱의 감성 유지) ---
+# --- 사이드바 ---
 with st.sidebar:
-    st.header("⚙️ 앱 설정")
-    st.write("1️⃣ **사용 방법**")
-    st.caption("녹음 후 초록색 버튼은 원래 소리, 파란색 버튼은 거꾸로 된 소리를 들려줍니다.")
-    st.write("---")
-    st.write("2️⃣ **파일 정보**")
-    if audio:
-        st.write(f"📏 녹음 크기: {len(audio['bytes'])/1024:.1f} KB")
-    else:
-        st.write("녹음된 파일이 없습니다.")
-    st.write("---")
-    st.caption("🚀 최종 수정: 2026.03.23")
+    st.header("⚙️ 앱 정보")
+    st.caption("🚀 버전: V3.0 (모든 브라우저 지원)")
+    st.caption("최종 수정: 2026.03.23")
